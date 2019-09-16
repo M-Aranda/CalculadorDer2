@@ -12,6 +12,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -43,6 +45,8 @@ public class TestOpenOffice {
                 ArrayList<Double> listaDeValoresxy = new ArrayList<>();
                 ArrayList<Double> listaDeValoresxCuadrado = new ArrayList<>();
                 ArrayList<Double> listaDeValoresyCuadrado = new ArrayList<>();
+                ArrayList<Double> listaDeValoresX = new ArrayList<>();
+                ArrayList<Double> listaDeValoresY = new ArrayList<>();
 
                 Double sumaDeLasXs = 0.0;
                 Double sumaDeLasYs = 0.0;
@@ -55,6 +59,9 @@ public class TestOpenOffice {
                     Double valorxy = ((Double) range.getCell(i, 0).getValue()) * ((Double) range.getCell(i, 1).getValue());
                     Double valorxCuadrado = Math.pow((Double) range.getCell(i, 0).getValue(), 2);
                     Double valoryCuadrado = Math.pow((Double) range.getCell(i, 1).getValue(), 2);
+
+                    listaDeValoresX.add((Double) range.getCell(i, 0).getValue());
+                    listaDeValoresY.add((Double) range.getCell(i, 1).getValue());
 
                     listaDeValoresxy.add(valorxy);
                     listaDeValoresxCuadrado.add(valorxCuadrado);
@@ -95,8 +102,8 @@ public class TestOpenOffice {
                 Double promedioDeYs = sumaDeLasYs / numerodeFilas;
 
                 Double b = ((numerodeFilas * sumaDeLasXYs) - (sumaDeLasXs * sumaDeLasYs)) / ((numerodeFilas * sumaDeLasXsAlCuadrado) - Math.pow(sumaDeLasXs, 2));
-                Double a= promedioDeYs-(b*promedioDeXs);
-                
+                Double a = promedioDeYs - (b * promedioDeXs);
+
                 Double r2 = Math.pow((numerodeFilas * sumaDeLasXYs - (sumaDeLasXs * sumaDeLasYs)), 2)
                         / ((numerodeFilas * sumaDeLasXsAlCuadrado - Math.pow(sumaDeLasXs, 2)) * (numerodeFilas * sumaDeLasYAlCuadrado - Math.pow(sumaDeLasYs, 2)));
 
@@ -118,14 +125,110 @@ public class TestOpenOffice {
                 System.out.println("b es: " + b);
                 System.out.println("r2 es: " + r2);
 
+                listaDeValoresX.sort(null);
+                listaDeValoresY.sort(null);
+
+                Double valorMinimox = listaDeValoresX.get(0);
+                Double valorMinimoy = listaDeValoresY.get(0);
+                Double valorMaximox = listaDeValoresX.get(listaDeValoresX.size() - 1);
+                Double valorMaximoy = listaDeValoresY.get(listaDeValoresY.size() - 1);
+
+                System.out.println("Trazar linea desde punto:" + (valorMinimox - 1) + "," + (valorMinimoy - 1) + " a " + (valorMaximox + 1.0) + "," + (valorMaximoy + 1.0) + " .");
+
                 sheet.setColumnWidth(0, 25.0);
                 sheet.setColumnWidth(1, 25.0);
 
-                spread.save(new File("src/ps.ods"));
+                spread.save(new File("src/r2Determinado.ods"));
 
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+
+        hacerCalculosDeElasticidad();
+    }
+
+    public static void hacerCalculosDeElasticidad() {
+
+        try {
+            SpreadSheet spread = new SpreadSheet(new File("src/ps.ods"));
+
+            List<Sheet> sheets = spread.getSheets();
+
+            spread.save(new File("src/ElasticidadDeterminada.ods"));
+
+            for (Sheet sheet : sheets) {
+
+                Range range = sheet.getDataRange();
+
+                int numerodeFilas = range.getNumRows();
+                int numerodeColumnas = range.getNumColumns();
+
+                ArrayList<Double> listadoDePreciosTotales = new ArrayList<>();
+                ArrayList<Double> listadoDeCambiosPorcentualesEnElPrecio = new ArrayList<>();
+                ArrayList<Double> listadoDeCambiosPorcentualesEnLaCantidad = new ArrayList<>();
+                ArrayList<Double> listadoDeElasticidades = new ArrayList<>();
+
+                Double ingresosTotales = 0.0;
+                Double cambioPorcentualEnElPrecio = 0.0;
+                Double cambioPorcentualEnLaCantidad = 0.0;      
+                String descripcion = "";
+
+                Double q = 0.0;
+                Double p = 0.0;
+
+                for (int i = 0; i < numerodeFilas; i++) {
+
+                    for (int j = 0; j < numerodeColumnas; j++) {
+
+                        if (j == 1) {
+                            Double cantidad = (Double) sheet.getDataRange().getCell(i, j - 1).getValue();
+                            Double precio = (Double) sheet.getDataRange().getCell(i, j).getValue();
+
+                            Double siguientePrecio = 0.0;
+                            Double siguienteCantidad= 0.0;
+                            Double elasticidad=0.0;
+                            
+                            try {
+                                siguientePrecio = (Double) sheet.getDataRange().getCell(i + 1, j).getValue();
+                            } catch (Exception e) {
+                            }
+                            
+                            
+                            try {
+                                siguienteCantidad=(Double) sheet.getDataRange().getCell(i + 1, 1-j).getValue();
+                            } catch (Exception e) {
+                            }
+
+                            ingresosTotales = cantidad * precio;
+                            listadoDePreciosTotales.add(ingresosTotales);
+
+                            cambioPorcentualEnElPrecio = (Math.abs((siguientePrecio - precio) / ((siguientePrecio + precio) / 2))) * 100;                   
+                            cambioPorcentualEnLaCantidad = (Math.abs((siguienteCantidad - cantidad) / ((siguienteCantidad + cantidad) / 2))) * 100;                   
+                            
+                            listadoDeCambiosPorcentualesEnElPrecio.add(cambioPorcentualEnElPrecio);
+                            listadoDeCambiosPorcentualesEnLaCantidad.add(cambioPorcentualEnLaCantidad);
+                            
+                            elasticidad=(((siguienteCantidad-cantidad))/((siguienteCantidad+cantidad)/2))/ ((siguientePrecio-precio)/((siguientePrecio+precio)/2)  )  ;
+                           
+                            elasticidad = Math.round(elasticidad*100)/100.00d;
+                            
+                            listadoDeElasticidades.add(Math.abs((elasticidad)));    
+           
+
+                        }
+
+                    }
+                }
+
+                
+              
+
+
+            }
+
+        } catch (IOException ex) {
+            Logger.getLogger(TestOpenOffice.class.getName()).log(Level.SEVERE, null, ex);
         }
 
     }
